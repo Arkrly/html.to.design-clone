@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Assets (generated files)
+assets/screenshots/*.png
+assets/images/*
+assets/*.json
+!assets/**/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+
+# Project specification (private)
+prompt.md

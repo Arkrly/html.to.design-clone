@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML to Design - Lightweight Converter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>HTML to Design</h1>
+      <p class="subtitle">Lightweight HTML → Design Tree Converter</p>
+    </header>
+
+    <main class="main">
+      <!-- Input Section -->
+      <section class="input-section">
+        <div class="input-group">
+          <label for="url-input">URL</label>
+          <div class="input-row">
+            <input 
+              type="url" 
+              id="url-input" 
+              placeholder="https://example.com" 
+              autocomplete="off"
+            >
+            <button id="fetch-btn" class="btn btn-secondary">Fetch</button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="html-input">HTML Content</label>
+          <textarea 
+            id="html-input" 
+            placeholder="Paste HTML here or fetch from URL..."
+            rows="10"
+          ></textarea>
+        </div>
+
+        <div class="options-row">
+          <div class="option">
+            <label for="width-input">Width</label>
+            <input type="number" id="width-input" value="1200" min="320" max="2560">
+          </div>
+          <div class="option">
+            <label for="height-input">Height</label>
+            <input type="number" id="height-input" value="800" min="200" max="2000">
+          </div>
+          <div class="option">
+            <label for="fullpage-checkbox">
+              <input type="checkbox" id="fullpage-checkbox">
+              Full Page
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Actions Section -->
+      <section class="actions-section">
+        <button id="screenshot-btn" class="btn btn-primary">
+          📷 Capture Screenshot
+        </button>
+        <button id="convert-btn" class="btn btn-primary">
+          🔄 Convert to Design
+        </button>
+        <button id="clear-btn" class="btn btn-ghost">
+          🗑️ Clear
+        </button>
+      </section>
+
+      <!-- Output Section -->
+      <section class="output-section">
+        <div class="tabs">
+          <button class="tab active" data-tab="screenshot">Screenshot</button>
+          <button class="tab" data-tab="design">Design Tree</button>
+          <button class="tab" data-tab="colors">Colors</button>
+        </div>
+
+        <div class="tab-content">
+          <!-- Screenshot Tab -->
+          <div id="screenshot-tab" class="tab-pane active">
+            <div class="screenshot-container">
+              <div id="screenshot-placeholder" class="placeholder">
+                <span>📷</span>
+                <p>No screenshot captured yet</p>
+              </div>
+              <img id="screenshot-image" src="" alt="Screenshot" style="display: none;">
+            </div>
+            <div id="screenshot-info" class="info-bar" style="display: none;">
+              <span id="screenshot-dimensions"></span>
+              <a id="screenshot-download" href="" download="screenshot.png" class="btn btn-small">
+                Download
+              </a>
+            </div>
+          </div>
+
+          <!-- Design Tree Tab -->
+          <div id="design-tab" class="tab-pane">
+            <div class="tree-controls">
+              <button id="expand-all-btn" class="btn btn-small">Expand All</button>
+              <button id="collapse-all-btn" class="btn btn-small">Collapse All</button>
+              <button id="copy-json-btn" class="btn btn-small">Copy JSON</button>
+            </div>
+            <div id="design-tree" class="design-tree">
+              <div class="placeholder">
+                <span>🌳</span>
+                <p>No design tree generated yet</p>
+              </div>
+            </div>
+            <div id="json-output" class="json-output" style="display: none;">
+              <pre id="json-content"></pre>
+            </div>
+          </div>
+
+          <!-- Colors Tab -->
+          <div id="colors-tab" class="tab-pane">
+            <div id="color-palette" class="color-palette">
+              <div class="placeholder">
+                <span>🎨</span>
+                <p>No colors extracted yet</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <span id="status-text">Ready</span>
+      <span id="status-time"></span>
+    </footer>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p id="loading-text">Processing...</p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

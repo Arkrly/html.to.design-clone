@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Design Tree Schema",
+  "description": "Lightweight design tree structure for HTML-to-Design conversion",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["frame", "text", "image", "svg"],
+      "description": "Node type in the design tree"
+    },
+    "name": {
+      "type": "string",
+      "description": "Element tag name or identifier"
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number" },
+        "h": { "type": "number" }
+      },
+      "required": ["x", "y", "w", "h"]
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "background": { "type": "string" },
+        "color": { "type": "string" },
+        "fontSize": { "type": "string" },
+        "fontFamily": { "type": "string" },
+        "fontWeight": { "type": "string" },
+        "padding": {
+          "type": "object",
+          "properties": {
+            "top": { "type": "number" },
+            "right": { "type": "number" },
+            "bottom": { "type": "number" },
+            "left": { "type": "number" }
+          }
+        },
+        "margin": {
+          "type": "object",
+          "properties": {
+            "top": { "type": "number" },
+            "right": { "type": "number" },
+            "bottom": { "type": "number" },
+            "left": { "type": "number" }
+          }
+        },
+        "border": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "number" },
+            "style": { "type": "string" },
+            "color": { "type": "string" },
+            "radius": { "type": "number" }
+          }
+        },
+        "display": { "type": "string" },
+        "flexDirection": { "type": "string" },
+        "justifyContent": { "type": "string" },
+        "alignItems": { "type": "string" },
+        "gap": { "type": "number" },
+        "opacity": { "type": "number" }
+      }
+    },
+    "text": {
+      "type": "string",
+      "description": "Text content for text nodes"
+    },
+    "src": {
+      "type": "string",
+      "description": "Source URL for image nodes"
+    },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#" }
+    }
+  },
+  "required": ["type", "name", "layout"]
+}
