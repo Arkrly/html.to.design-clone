@@ -64,6 +64,9 @@
         <button id="convert-btn" class="btn btn-primary">
           🔄 Convert to Design
         </button>
+        <button id="components-btn" class="btn btn-primary">
+          🧩 Extract Components
+        </button>
         <button id="clear-btn" class="btn btn-ghost">
           🗑️ Clear
         </button>
@@ -74,6 +77,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="screenshot">Screenshot</button>
           <button class="tab" data-tab="design">Design Tree</button>
+          <button class="tab" data-tab="components">Components</button>
           <button class="tab" data-tab="colors">Colors</button>
         </div>
 
@@ -110,6 +114,21 @@
             </div>
             <div id="json-output" class="json-output" style="display: none;">
               <pre id="json-content"></pre>
+            </div>
+          </div>
+
+          <!-- Components Tab -->
+          <div id="components-tab" class="tab-pane">
+            <div class="components-controls">
+              <button id="capture-all-btn" class="btn btn-small">📷 Capture All Components</button>
+              <button id="copy-components-btn" class="btn btn-small">Copy JSON</button>
+            </div>
+            <div id="components-summary" class="components-summary" style="display: none;"></div>
+            <div id="components-grid" class="components-grid">
+              <div class="placeholder">
+                <span>🧩</span>
+                <p>No components extracted yet</p>
+              </div>
             </div>
           </div>
 

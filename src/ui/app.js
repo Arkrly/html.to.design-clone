@@ -19,6 +19,7 @@
     fetchBtn: document.getElementById('fetch-btn'),
     screenshotBtn: document.getElementById('screenshot-btn'),
     convertBtn: document.getElementById('convert-btn'),
+    componentsBtn: document.getElementById('components-btn'),
     clearBtn: document.getElementById('clear-btn'),
     tabs: document.querySelectorAll('.tab'),
     tabPanes: document.querySelectorAll('.tab-pane'),
@@ -31,6 +32,10 @@
     jsonContent: document.getElementById('json-content'),
     jsonOutput: document.getElementById('json-output'),
     colorPalette: document.getElementById('color-palette'),
+    componentsGrid: document.getElementById('components-grid'),
+    componentsSummary: document.getElementById('components-summary'),
+    captureAllBtn: document.getElementById('capture-all-btn'),
+    copyComponentsBtn: document.getElementById('copy-components-btn'),
     expandAllBtn: document.getElementById('expand-all-btn'),
     collapseAllBtn: document.getElementById('collapse-all-btn'),
     copyJsonBtn: document.getElementById('copy-json-btn'),
@@ -42,6 +47,8 @@
 
   // State
   let currentDesignTree = null;
+  let currentComponents = null;
+  let currentUrl = null;
 
   // Initialize
   function init() {
@@ -56,6 +63,7 @@
     elements.fetchBtn.addEventListener('click', handleFetch);
     elements.screenshotBtn.addEventListener('click', handleScreenshot);
     elements.convertBtn.addEventListener('click', handleConvert);
+    elements.componentsBtn.addEventListener('click', handleExtractComponents);
     elements.clearBtn.addEventListener('click', handleClear);
     
     elements.tabs.forEach(tab => {
@@ -65,6 +73,8 @@
     elements.expandAllBtn.addEventListener('click', () => toggleAllDetails(true));
     elements.collapseAllBtn.addEventListener('click', () => toggleAllDetails(false));
     elements.copyJsonBtn.addEventListener('click', handleCopyJson);
+    elements.captureAllBtn.addEventListener('click', handleCaptureAllComponents);
+    elements.copyComponentsBtn.addEventListener('click', handleCopyComponents);
 
     // Enter key on URL input
     elements.urlInput.addEventListener('keypress', (e) => {
@@ -199,6 +209,223 @@
     }
   }
 
+  // Handle component extraction
+  async function handleExtractComponents() {
+    const url = elements.urlInput.value.trim();
+    if (!url) {
+      showToast('Please enter a URL', 'error');
+      return;
+    }
+
+    currentUrl = url;
+    showLoading('Extracting components...');
+    updateStatus('Extracting...');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/components`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        currentComponents = data.components;
+        displayComponents(data.components, data.summary);
+        showToast(`Found ${data.summary.total} components`, 'success');
+        updateStatus('Components extracted');
+        handleTabSwitch('components');
+      } else {
+        throw new Error(data.error || 'Failed to extract components');
+      }
+    } catch (error) {
+      showToast(error.message, 'error');
+      updateStatus('Extraction failed');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // Handle capture single component
+  async function handleCaptureComponent(selector, index) {
+    if (!currentUrl) {
+      showToast('No URL available', 'error');
+      return;
+    }
+
+    showLoading('Capturing component...');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/components/capture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl, selector })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update the component card with the screenshot
+        const card = document.querySelector(`[data-component-index="${index}"]`);
+        if (card) {
+          let screenshotDiv = card.querySelector('.component-screenshot');
+          if (!screenshotDiv) {
+            screenshotDiv = document.createElement('div');
+            screenshotDiv.className = 'component-screenshot';
+            card.querySelector('.component-card-body').appendChild(screenshotDiv);
+          }
+          screenshotDiv.innerHTML = `<img src="${data.imagePath}" alt="Component Screenshot">`;
+        }
+        showToast('Component captured', 'success');
+      } else {
+        throw new Error(data.error || 'Failed to capture component');
+      }
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // Handle capture all components
+  async function handleCaptureAllComponents() {
+    if (!currentUrl || !currentComponents) {
+      showToast('No components to capture', 'error');
+      return;
+    }
+
+    showLoading('Capturing all components...');
+    updateStatus('Capturing components...');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/components/capture-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Re-extract components to refresh the display with screenshots
+        await handleExtractComponents();
+        showToast(`Captured ${data.captured} components`, 'success');
+        updateStatus('All components captured');
+      } else {
+        throw new Error(data.error || 'Failed to capture components');
+      }
+    } catch (error) {
+      showToast(error.message, 'error');
+      updateStatus('Capture failed');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // Handle copy components JSON
+  function handleCopyComponents() {
+    if (!currentComponents) {
+      showToast('No components to copy', 'error');
+      return;
+    }
+
+    const json = JSON.stringify(currentComponents, null, 2);
+    copyToClipboard(json);
+    showToast('Components JSON copied', 'success');
+  }
+
+  // Display extracted components
+  function displayComponents(components, summary) {
+    // Update summary
+    if (summary) {
+      elements.componentsSummary.style.display = 'block';
+      const typeStats = Object.entries(summary.byType || {})
+        .map(([type, count]) => `<span class="stat"><span class="stat-value">${count}</span> ${type}s</span>`)
+        .join('');
+      elements.componentsSummary.innerHTML = `
+        <div class="summary-stats">
+          <span class="stat">Total: <span class="stat-value">${summary.total}</span></span>
+          ${typeStats}
+        </div>
+      `;
+    }
+
+    // Update grid
+    if (!components || components.length === 0) {
+      elements.componentsGrid.innerHTML = '<div class="placeholder"><span>🧩</span><p>No components found</p></div>';
+      return;
+    }
+
+    const componentIcons = {
+      button: '🔘',
+      link: '🔗',
+      card: '🃏',
+      navbar: '📍',
+      form: '📋',
+      input: '📝',
+      image: '🖼️',
+      list: '📃',
+      table: '📊',
+      modal: '🪟',
+      dropdown: '📥',
+      icon: '✨',
+      heading: '📌',
+      paragraph: '📄',
+      footer: '📎',
+      header: '🎯',
+      sidebar: '📑',
+      hero: '🦸',
+      unknown: '❓'
+    };
+
+    const html = components.map((comp, index) => `
+      <div class="component-card" data-component-index="${index}">
+        <div class="component-card-header">
+          <span class="component-type">
+            <span class="component-type-icon">${componentIcons[comp.type] || '🧩'}</span>
+            ${comp.type}
+          </span>
+        </div>
+        <div class="component-card-body">
+          <div class="component-info">
+            <div class="component-info-row">
+              <span class="component-info-label">Tag:</span>
+              <span class="component-info-value">${comp.tagName}</span>
+            </div>
+            ${comp.text ? `
+            <div class="component-info-row">
+              <span class="component-info-label">Text:</span>
+              <span class="component-info-value">${escapeHtml(comp.text.substring(0, 50))}${comp.text.length > 50 ? '...' : ''}</span>
+            </div>` : ''}
+            <div class="component-info-row">
+              <span class="component-info-label">Size:</span>
+              <span class="component-info-value">${Math.round(comp.bounds.width)}x${Math.round(comp.bounds.height)}</span>
+            </div>
+          </div>
+          ${comp.classes && comp.classes.length > 0 ? `
+          <div class="component-preview">.${comp.classes.slice(0, 3).join(' .')}</div>
+          ` : ''}
+        </div>
+        <div class="component-card-footer">
+          <button class="btn btn-small btn-secondary" onclick="captureComponent('${escapeSelector(comp.selector)}', ${index})">
+            📷 Capture
+          </button>
+          <button class="btn btn-small btn-ghost" onclick="copyToClipboard('${escapeSelector(comp.selector)}')">
+            📋 Selector
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    elements.componentsGrid.innerHTML = html;
+  }
+
+  // Escape selector for use in JS strings
+  function escapeSelector(selector) {
+    return selector.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  }
+
   // Handle clear
   function handleClear() {
     elements.urlInput.value = '';
@@ -209,7 +436,11 @@
     elements.designTree.innerHTML = '<div class="placeholder"><span>🌳</span><p>No design tree generated yet</p></div>';
     elements.jsonOutput.style.display = 'none';
     elements.colorPalette.innerHTML = '<div class="placeholder"><span>🎨</span><p>No colors extracted yet</p></div>';
+    elements.componentsGrid.innerHTML = '<div class="placeholder"><span>🧩</span><p>No components extracted yet</p></div>';
+    elements.componentsSummary.style.display = 'none';
     currentDesignTree = null;
+    currentComponents = null;
+    currentUrl = null;
     updateStatus('Cleared');
     showToast('All cleared', 'success');
   }
@@ -389,6 +620,7 @@
 
   // Expose copyToClipboard globally for inline onclick
   window.copyToClipboard = copyToClipboard;
+  window.captureComponent = handleCaptureComponent;
 
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {

@@ -9,16 +9,17 @@ const fs = require('fs');
 
 // Core modules
 const { htmlToDesignTree, urlToDesignTree, extractColorPalette } = require('./core/toDesignTree');
-const { captureAndSaveWithTimestamp, getPageHtml, cleanup } = require('./screenshot/capture');
+const { captureAndSaveWithTimestamp, getPageHtml, cleanup, extractComponents, captureComponent, captureAllComponents } = require('./screenshot/capture');
 
 // Configuration
 const PORT = process.env.PORT || 3000;
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
 const SCREENSHOTS_DIR = path.join(ASSETS_DIR, 'screenshots');
+const COMPONENTS_DIR = path.join(ASSETS_DIR, 'components');
 
 // Ensure directories exist
 function ensureDirectories() {
-  const dirs = [ASSETS_DIR, SCREENSHOTS_DIR, path.join(ASSETS_DIR, 'images')];
+  const dirs = [ASSETS_DIR, SCREENSHOTS_DIR, COMPONENTS_DIR, path.join(ASSETS_DIR, 'images')];
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -57,6 +58,7 @@ app.use((req, res, next) => {
   });
   next();
 });
+
 
 /**
  * API: Capture screenshot from URL
@@ -314,6 +316,203 @@ app.get('/api/screenshots', (req, res) => {
   }
 });
 
+/**
+ * API: Extract components from a page
+ * POST /api/components
+ */
+app.post('/api/components', async (req, res) => {
+  try {
+    const { url, width, height, delay } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: 'URL is required'
+      });
+    }
+
+    console.log(`Extracting components from: ${url}`);
+
+    const options = {
+      width: parseInt(width) || 1200,
+      height: parseInt(height) || 800,
+      delay: parseInt(delay) || 0
+    };
+
+    const result = await extractComponents(url, options);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Components extraction error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to extract components'
+    });
+  }
+});
+
+/**
+ * API: Capture a specific component screenshot
+ * POST /api/components/capture
+ */
+app.post('/api/components/capture', async (req, res) => {
+  try {
+    const { url, selector, width, height, delay, transparent } = req.body;
+
+    if (!url || !selector) {
+      return res.status(400).json({
+        success: false,
+        error: 'URL and selector are required'
+      });
+    }
+
+    console.log(`Capturing component: ${selector} from ${url}`);
+
+    const options = {
+      width: parseInt(width) || 1200,
+      height: parseInt(height) || 800,
+      delay: parseInt(delay) || 0,
+      transparent: transparent === true
+    };
+
+    const result = await captureComponent(url, selector, options);
+
+    if (result.success) {
+      // Save the component screenshot
+      const timestamp = Date.now();
+      const safeName = selector.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 50);
+      const filename = `${safeName}-${timestamp}.png`;
+      const filepath = path.join(COMPONENTS_DIR, filename);
+      
+      fs.writeFileSync(filepath, result.buffer);
+
+      res.json({
+        success: true,
+        imagePath: `/assets/components/${filename}`,
+        selector: result.selector,
+        bounds: result.bounds,
+        info: result.info,
+        timestamp: result.timestamp
+      });
+    } else {
+      res.status(404).json(result);
+    }
+
+  } catch (error) {
+    console.error('Component capture error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to capture component'
+    });
+  }
+});
+
+/**
+ * API: Capture all components from a page
+ * POST /api/components/capture-all
+ */
+app.post('/api/components/capture-all', async (req, res) => {
+  try {
+    const { url, width, height, delay } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: 'URL is required'
+      });
+    }
+
+    console.log(`Capturing all components from: ${url}`);
+
+    const options = {
+      width: parseInt(width) || 1200,
+      height: parseInt(height) || 800,
+      delay: parseInt(delay) || 0
+    };
+
+    // Create timestamped folder for this capture
+    const timestamp = Date.now();
+    const outputDir = path.join(COMPONENTS_DIR, `capture-${timestamp}`);
+
+    const result = await captureAllComponents(url, outputDir, options);
+
+    // Map file paths to URLs
+    if (result.success && result.components) {
+      result.components = result.components.map(comp => ({
+        ...comp,
+        imagePath: comp.filepath ? `/assets/components/capture-${timestamp}/${comp.filename}` : null
+      }));
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Capture all components error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to capture components'
+    });
+  }
+});
+
+/**
+ * API: List captured components
+ * GET /api/components/list
+ */
+app.get('/api/components/list', (req, res) => {
+  try {
+    const components = [];
+
+    // Get individual component files
+    if (fs.existsSync(COMPONENTS_DIR)) {
+      const files = fs.readdirSync(COMPONENTS_DIR);
+      
+      files.forEach(file => {
+        const filepath = path.join(COMPONENTS_DIR, file);
+        const stat = fs.statSync(filepath);
+        
+        if (stat.isFile() && file.endsWith('.png')) {
+          components.push({
+            type: 'single',
+            filename: file,
+            path: `/assets/components/${file}`,
+            timestamp: stat.mtimeMs
+          });
+        } else if (stat.isDirectory() && file.startsWith('capture-')) {
+          // Get files from capture folders
+          const captureFiles = fs.readdirSync(filepath);
+          captureFiles.forEach(cf => {
+            if (cf.endsWith('.png')) {
+              components.push({
+                type: 'batch',
+                folder: file,
+                filename: cf,
+                path: `/assets/components/${file}/${cf}`,
+                timestamp: parseInt(file.replace('capture-', ''))
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Sort by timestamp descending
+    components.sort((a, b) => b.timestamp - a.timestamp);
+
+    res.json({
+      success: true,
+      components: components.slice(0, 100)
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Serve UI for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'ui', 'index.html'));
@@ -350,10 +549,10 @@ function start() {
     console.log(`║  Server running at http://localhost:${PORT}   ║`);
     console.log('║                                            ║');
     console.log('║  Endpoints:                                ║');
-    console.log('║    POST /api/screenshot - Capture screen   ║');
-    console.log('║    POST /api/convert    - HTML to design   ║');
-    console.log('║    POST /api/fetch      - Fetch HTML       ║');
-    console.log('║    GET  /api/design     - Get design tree  ║');
+    console.log('║    POST /api/screenshot  - Capture screen  ║');
+    console.log('║    POST /api/convert     - HTML to design  ║');
+    console.log('║    POST /api/components  - Extract comps   ║');
+    console.log('║    GET  /api/design      - Get design tree ║');
     console.log('║                                            ║');
     console.log('║  Press Ctrl+C to stop                      ║');
     console.log('╚════════════════════════════════════════════╝');
